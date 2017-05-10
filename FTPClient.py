@@ -4,6 +4,7 @@ from __future__ import  print_function, division, absolute_import
 
 import wx
 import sys
+import threading
 
 from twisted.internet import wxreactor
 wxreactor.install()
@@ -19,6 +20,7 @@ from twisted.protocols.policies import TimeoutMixin, ThrottlingProtocol, Throttl
 #from twisted.protocols.ftp import FTPFile
 
 from twisted.internet import protocol
+from twisted.internet import threads
 from twisted.python import log
 
 class TextSend(wx.Frame):
@@ -67,7 +69,7 @@ class TextSend(wx.Frame):
         if yes:
             print("Starting timer")
             #self.timer.Start(500)
-            didStart = self.timer.Start(50)
+            didStart = self.timer.Start(1)
             print("Started timer:", didStart)
             print("Running:", self.timer.IsRunning())
             #self.startTimer(True)
@@ -92,7 +94,17 @@ class TextSend(wx.Frame):
         #self.protocol.cwd("").addCallback(self.getCWD)
         #fileList = FTPFileListProtocol()
         #self.protocol.list(".", fileList).addCallbacks(self.printFiles, self.fail, callbackArgs=(fileList,))
+        #self.protocol.retrieveFile(self.fileName, FileWriter(self.fileName), offset=0).addCallbacks(self.done, self.fail)
+        #threads.deferToThread(self.protocol.retrieveFile, self.fileName, FileWriter(self.fileName), offset=0)).addCallbacks(self.done, self.fail)
+        #d = threads.deferToThread(self.protocol.retrieveFile, self.fileName, FileWriter(self.fileName), offset=0)
+        #d.addCallbacks(self.done, self.fail)
+        d = threads.deferToThread(self.retrieve)
+        d.addCallback(self.done)
+
+    def retrieve(self):
+        print(threading.current_thread())
         self.protocol.retrieveFile(self.fileName, FileWriter(self.fileName), offset=0).addCallbacks(self.done, self.fail)
+        return "Done with deferToThread"
         
     def getCWD(self, msg):
         print("GOT STUFF:", msg)
@@ -105,7 +117,9 @@ class TextSend(wx.Frame):
         print('Total: %d files' % (len(fileList.files)))
 
     def done(self, msg):
+        print(threading.current_thread())
         print("DONE Retrieving:", msg)
+        return "STUFF"
             
     def fail(self, error):
         print('Failed. Error was:')
@@ -232,14 +246,17 @@ class TestFactory(FTPFactory):
 class FileWriter(protocol.Protocol):
 
     def __init__(self, fileName):
-        self.f = open("/home/tristan/Desktop/ftpTest/placedFiles/"+fileName, 'wb')
+        self.f = open(fileName, 'wb')
+        print("FROM FileWriter __init__:", threading.current_thread())
 
     def dataReceived(self, data):
         print("Byte size", len(data))
+        print("FROM FileWriter dataReceived:", threading.current_thread())
         self.f.write(data)
 
     def connectionLost(self, reason):
         print("Writing closed and done")
+        print("FROM FileWriter connectionLost:", threading.current_thread())
         self.f.close()
 
 class TestClient(FTPClient, TimeoutMixin, object):
@@ -316,8 +333,10 @@ if __name__ == "__main__":
     reactor.registerWxApp(app)
     f = FileClientFactory(app.frame)
     #f = FileClientFactoryThrottle(app.frame)
-    reactor.connectTCP("localhost", 5502, f)
-    #reactor.connectTCP("192.168.254.19", 5502, f)
+    reactor.connectTCP("localhost", 5504, f)
+    #reactor.connectTCP("192.168.122.1", 5504, f)
+    #reactor.connectTCP("10.155.88.135", 5504, f)
+    #reactor.connectTCP("192.168.254.19", 5504, f)
     reactor.run()
     print("some stuff")
     

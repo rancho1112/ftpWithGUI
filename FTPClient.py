@@ -21,7 +21,98 @@ from twisted.protocols.policies import TimeoutMixin, ThrottlingProtocol, Throttl
 from twisted.internet import protocol
 from twisted.python import log
 
+class TextSend(wx.Frame):
 
+    def __init__(self):
+        wx.Frame.__init__(self, None, -1, "Request Files", size=(200, 75))
+
+        self.protocol = None # client protocol
+        self.factory = None
+        
+        panel = wx.Panel(self)
+
+        vertSizer = wx.BoxSizer(wx.VERTICAL)
+        horzSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.fileName = None
+        self.textbox = wx.TextCtrl(parent=panel, id=100, size=(100,-1))
+        self.btn = wx.Button(panel, label="Retr.")
+
+        # timer and checkbox for timer
+        self.timer = wx.Timer(self, id=wx.ID_ANY)
+        self.check = wx.CheckBox(parent=panel, label="Start blocking")
+
+        #Bind
+        self.textbox.Bind(wx.EVT_TEXT, self.getText)
+        self.btn.Bind(wx.EVT_BUTTON, self.press)
+        self.check.Bind(wx.EVT_CHECKBOX, self.onCheck)
+        self.Bind(wx.EVT_TIMER, self.onTimer, self.timer)
+
+        horzSizer.Add(self.textbox, flag=wx.ALIGN_CENTER)
+        horzSizer.Add(self.btn, flag=wx.ALIGN_CENTER)
+
+        vertSizer.Add(horzSizer, flag=wx.ALIGN_CENTER)
+        vertSizer.Add(self.check, flag=wx.ALIGN_CENTER)
+
+        panel.SetSizer(vertSizer)
+        panel.Layout()
+
+    def getText(self, evt):
+        self.fileName = str(self.textbox.GetValue())
+
+    def onCheck(self, evt):
+        print("CHECKED")
+        yes = self.check.GetValue()
+        print(yes)
+        if yes:
+            print("Starting timer")
+            #self.timer.Start(500)
+            didStart = self.timer.Start(50)
+            print("Started timer:", didStart)
+            print("Running:", self.timer.IsRunning())
+            #self.startTimer(True)
+        else: # no
+            self.timer.Stop()
+            #self.startTimer(False)
+
+    def onTimer(self, evt):
+        #print("Triggered timer")
+        pass
+            
+    def startTimer(self, boolean):
+        if boolean:
+            self.timer.Start(50)
+        else:
+            self.timer.Stop()
+        
+    def press(self, evt):
+        print("Send:", self.fileName)
+        self.protocol.pwd().addCallback(self.getCWD)
+        self.protocol.getDirectory().addCallback(self.getCWD)
+        #self.protocol.cwd("").addCallback(self.getCWD)
+        #fileList = FTPFileListProtocol()
+        #self.protocol.list(".", fileList).addCallbacks(self.printFiles, self.fail, callbackArgs=(fileList,))
+        self.protocol.retrieveFile(self.fileName, FileWriter(self.fileName), offset=0).addCallbacks(self.done, self.fail)
+        
+    def getCWD(self, msg):
+        print("GOT STUFF:", msg)
+
+    def printFiles(self, results, fileList):
+        #print("MESSAGE:", results)
+        for file in fileList.files:
+            print('    %s: %d bytes, %s' \
+              % (file['filename'], file['size'], file['date']))
+        print('Total: %d files' % (len(fileList.files)))
+
+    def done(self, msg):
+        print("DONE Retrieving:", msg)
+            
+    def fail(self, error):
+        print('Failed. Error was:')
+        print(error)
+
+
+"""
 class TextSend(wx.Frame):
 
     def __init__(self):
@@ -78,6 +169,7 @@ class TextSend(wx.Frame):
     def fail(self, error):
         print('Failed. Error was:')
         print(error)
+"""
 """
 class FileReceiver(FTPClient):
 

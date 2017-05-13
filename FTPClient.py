@@ -5,6 +5,7 @@ from __future__ import  print_function, division, absolute_import
 import wx
 import sys
 import threading
+import time
 
 from twisted.internet import wxreactor
 wxreactor.install()
@@ -17,16 +18,19 @@ from twisted.protocols.ftp import FTPClient
 from twisted.protocols.ftp import DTPFactory
 from twisted.protocols.ftp import ProtocolWrapper
 from twisted.protocols.policies import TimeoutMixin, ThrottlingProtocol, ThrottlingFactory
-#from twisted.protocols.ftp import FTPFile
 
 from twisted.internet import protocol
 from twisted.internet import threads
 from twisted.python import log
 
+import numpy as np
+
+transferTimes = []
+
 class TextSend(wx.Frame):
 
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, "Request Files", size=(200, 75))
+        wx.Frame.__init__(self, None, -1, "Request Files", size=(200, 110))
 
         self.protocol = None # client protocol
         self.factory = None
@@ -43,6 +47,7 @@ class TextSend(wx.Frame):
         # timer and checkbox for timer
         self.timer = wx.Timer(self, id=wx.ID_ANY)
         self.check = wx.CheckBox(parent=panel, label="Start blocking")
+        self.gauge = wx.Gauge(panel, range=1000)
 
         #Bind
         self.textbox.Bind(wx.EVT_TEXT, self.getText)
@@ -55,6 +60,7 @@ class TextSend(wx.Frame):
 
         vertSizer.Add(horzSizer, flag=wx.ALIGN_CENTER)
         vertSizer.Add(self.check, flag=wx.ALIGN_CENTER)
+        vertSizer.Add(self.gauge, flag=wx.ALIGN_CENTER)
 
         panel.SetSizer(vertSizer)
         panel.Layout()
@@ -79,6 +85,13 @@ class TextSend(wx.Frame):
 
     def onTimer(self, evt):
         #print("Triggered timer")
+        max = self.gauge.GetRange()
+        current = self.gauge.GetValue()
+        #print(current)
+        if current < max:
+            self.gauge.SetValue(current+1)
+        else:
+            self.gauge.SetValue(0)
         pass
             
     def startTimer(self, boolean):
@@ -91,6 +104,7 @@ class TextSend(wx.Frame):
         print("Send:", self.fileName)
         self.protocol.pwd().addCallback(self.getCWD)
         self.protocol.getDirectory().addCallback(self.getCWD)
+        print("Average:", np.mean(transferTimes), "and median:", np.median(transferTimes))
         #self.protocol.cwd("").addCallback(self.getCWD)
         #fileList = FTPFileListProtocol()
         #self.protocol.list(".", fileList).addCallbacks(self.printFiles, self.fail, callbackArgs=(fileList,))
@@ -246,18 +260,23 @@ class TestFactory(FTPFactory):
 class FileWriter(protocol.Protocol):
 
     def __init__(self, fileName):
+        self.time = 0 - time.clock()
         self.f = open(fileName, 'wb')
         print("FROM FileWriter __init__:", threading.current_thread())
 
     def dataReceived(self, data):
-        print("Byte size", len(data))
-        print("FROM FileWriter dataReceived:", threading.current_thread())
+        #print("Byte size", len(data))
+        #print("FROM FileWriter dataReceived:", threading.current_thread())
         self.f.write(data)
 
     def connectionLost(self, reason):
         print("Writing closed and done")
         print("FROM FileWriter connectionLost:", threading.current_thread())
         self.f.close()
+        self.time += time.clock()
+        print("Took %.3f s to download" % self.time)
+        transferTimes.append(self.time)
+        
 
 class TestClient(FTPClient, TimeoutMixin, object):
 
@@ -334,9 +353,8 @@ if __name__ == "__main__":
     f = FileClientFactory(app.frame)
     #f = FileClientFactoryThrottle(app.frame)
     reactor.connectTCP("localhost", 5504, f)
-    #reactor.connectTCP("192.168.122.1", 5504, f)
     #reactor.connectTCP("10.155.88.135", 5504, f)
-    #reactor.connectTCP("192.168.254.19", 5504, f)
+    #reactor.connectTCP("192.168.254.18", 5504, f)
     reactor.run()
     print("some stuff")
     

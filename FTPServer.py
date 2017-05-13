@@ -12,7 +12,7 @@ from twisted.cred.portal import Portal
 from twisted.cred.checkers import AllowAnonymousAccess
 
 
-p = Portal(FTPRealm("."), [AllowAnonymousAccess()])
+p = Portal(FTPRealm("test/"), [AllowAnonymousAccess()])
 #f = ThrottlingFactory(FTPFactory, readLimit=1000, writeLimit=1000)
 #p = Tho(p)
 
